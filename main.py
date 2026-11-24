@@ -44,12 +44,25 @@ def validate(text: str) -> list:
 
 
 def write_entry(directory: str) -> str:
-    """Write ENTRY to entry.txt in `directory`, no trailing newline."""
+    """Write ENTRY to entry.txt in `directory`, no trailing newline.
+
+    The line is validated again at write time so a bad line fails the
+    run with a clear message instead of producing a bad entry.txt.
+    """
+    problems = validate(ENTRY)
+    if problems:
+        raise ValueError("invalid entry: " + "; ".join(problems))
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, "entry.txt")
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(ENTRY)
     return path
+
+
+def validate_written(path: str) -> list:
+    """Re-validate the file on disk against the gate (non-empty, 1-200
+    chars, single line); returns a list of failures, empty when valid."""
+    return validate(read_back(path))
 
 
 def read_back(path: str) -> str:
@@ -88,6 +101,11 @@ def main(argv=None) -> int:
     path = write_entry(out_dir)
     if read_back(path) != ENTRY:
         print("FAILED: entry.txt does not match ENTRY", file=sys.stderr)
+        return 1
+    problems = validate_written(path)
+    if problems:
+        for problem in problems:
+            print("invalid entry.txt: " + problem, file=sys.stderr)
         return 1
     print("wrote %s (%d chars)" % (path, len(ENTRY)))
     return 0
